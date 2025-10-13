@@ -1,0 +1,88 @@
+import subprocess
+import sys
+
+def get_landscapes_from_md(md_file="cf_commands.md"):
+    landscapes = []
+    try:
+        with open(md_file, "r") as f:
+            for line in f:
+                if line.strip().startswith("cf login -a"):
+                    # Example: cf login -a https://api.cf.eu10.hana.ondemand.com
+                    parts = line.strip().split()
+                    if "-a" in parts:
+                        idx = parts.index("-a")
+                        if idx + 1 < len(parts):
+                            landscapes.append(parts[idx + 1])
+    except Exception as e:
+        print(f"Could not read landscapes from {md_file}: {e}")
+    return landscapes
+
+def cf_login():
+    landscapes = get_landscapes_from_md()
+    if not landscapes:
+        print("No landscapes found in cf_commands.md. Please add cf login commands with -a <API endpoint>.")
+        sys.exit(1)
+    print("Available landscapes:")
+    for idx, l in enumerate(landscapes):
+        print(f"{idx + 1}. {l}")
+    while True:
+        try:
+            choice = int(input("Select landscape number to login: "))
+            if 1 <= choice <= len(landscapes):
+                api_endpoint = landscapes[choice - 1]
+                break
+            else:
+                print("Invalid selection.")
+        except ValueError:
+            print("Please enter a valid number.")
+    username = input("Enter your CF username: ").strip()
+    password = input("Enter your CF password: ").strip()
+    org = input("Enter your CF organization (leave blank to skip): ").strip()
+    space = input("Enter your CF space (leave blank to skip): ").strip()
+    cf_command = [
+        "cf", "login",
+        "-a", api_endpoint,
+        "-u", username,
+        "-p", password
+    ]
+    if org:
+        cf_command += ["-o", org]
+    if space:
+        cf_command += ["-s", space]
+    print(f"\nRunning command: {' '.join(cf_command)}\n")
+    try:
+        result = subprocess.run(cf_command, check=True, capture_output=True, text=True)
+        print("Login successful!")
+        print(result.stdout)
+    except subprocess.CalledProcessError as e:
+        print("Login failed.")
+        print(e.stderr)
+        sys.exit(1)
+
+def assign_user_role():
+    org = input("Enter the organization name: ").strip()
+    space = input("Enter the space name: ").strip()
+    user_email = input("Enter the user's email address: ").strip()
+    role = input("Enter the role to assign (SpaceManager, SpaceDeveloper, SpaceAuditor): ").strip()
+
+    cf_command = [
+        "cf", "set-space-role",
+        user_email,
+        org,
+        space,
+        role
+    ]
+
+    print(f"\nRunning command: {' '.join(cf_command)}\n")
+
+    try:
+        result = subprocess.run(cf_command, check=True, capture_output=True, text=True)
+        print("Role assigned successfully!")
+        print(result.stdout)
+    except subprocess.CalledProcessError as e:
+        print("Failed to assign role.")
+        print(e.stderr)
+
+if __name__ == "__main__":
+    cf_login()
+    assign_user_role()
